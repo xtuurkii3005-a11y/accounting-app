@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دفتر — نظام الفواتير والضرائب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- الشريط الجانبي -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">د</span>
+      <div class="brand-text">
+        <strong>دفتر</strong>
+        <small>الفواتير والضرائب</small>
+      </div>
+    </div>
+
+    <nav class="ruler">
+      <div class="ruler-tick active" data-view="dashboard">
+        <span class="tick-num">01</span> لوحة الحسابات
+      </div>
+      <div class="ruler-tick" data-view="invoices">
+        <span class="tick-num">02</span> سجل الفواتير
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <p>معدل ضريبة القيمة المضافة الافتراضي</p>
+      <div class="vat-setting">
+        <input type="number" id="defaultVat" value="15" min="0" max="100" step="0.5">
+        <span>%</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- المحتوى الرئيسي -->
+  <main class="main">
+
+    <header class="topbar">
+      <div>
+        <h1>لوحة الحسابات</h1>
+        <p class="sub">نظرة سريعة على كل فواتيرك ومستحقاتك الضريبية</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn-ghost" id="openScanModal">📷 مسح فاتورة بالصورة</button>
+        <button class="btn-primary" id="openAddModal">+ فاتورة جديدة</button>
+      </div>
+    </header>
+
+    <!-- بطاقات الملخص -->
+    <section class="summary-grid">
+      <div class="stat-card">
+        <span class="stat-label">إجمالي الفواتير</span>
+        <span class="stat-value" id="statCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">إجمالي المبيعات (قبل الضريبة)</span>
+        <span class="stat-value mono" id="statSubtotal">0.00</span>
+      </div>
+      <div class="stat-card accent">
+        <span class="stat-label">إجمالي ضريبة القيمة المضافة</span>
+        <span class="stat-value mono" id="statVat">0.00</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">الإجمالي شامل الضريبة</span>
+        <span class="stat-value mono" id="statTotal">0.00</span>
+      </div>
+      <div class="stat-card warn">
+        <span class="stat-label">غير محصّلة</span>
+        <span class="stat-value mono" id="statUnpaid">0.00</span>
+      </div>
+    </section>
+
+    <!-- أدوات التصفية -->
+    <section class="toolbar">
+      <input type="text" id="searchInput" placeholder="ابحث برقم الفاتورة أو اسم العميل...">
+      <select id="filterStatus">
+        <option value="all">كل الحالات</option>
+        <option value="paid">محصّلة</option>
+        <option value="unpaid">غير محصّلة</option>
+      </select>
+      <select id="filterCategory">
+        <option value="all">كل التصنيفات</option>
+      </select>
+      <button class="btn-ghost" id="exportCsv">تصدير CSV</button>
+    </section>
+
+    <!-- جدول الفواتير -->
+    <section class="table-wrap">
+      <table id="invoiceTable">
+        <thead>
+          <tr>
+            <th data-sort="date">التاريخ ↕</th>
+            <th data-sort="invoiceNumber">رقم الفاتورة ↕</th>
+            <th data-sort="party">الجهة</th>
+            <th>التصنيف</th>
+            <th data-sort="amount">المبلغ (قبل الضريبة) ↕</th>
+            <th>الضريبة</th>
+            <th data-sort="total">الإجمالي ↕</th>
+            <th>الحالة</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="invoiceRows">
+          <!-- تُملأ عبر JS -->
+        </tbody>
+      </table>
+      <div class="empty-state" id="emptyState">
+        <p>لا توجد فواتير بعد</p>
+        <span>اضغط "فاتورة جديدة" لإضافة أول فاتورة لك</span>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- نافذة إضافة / تعديل فاتورة -->
+<div class="modal-overlay" id="modalOverlay">
+  <form class="modal" id="invoiceForm">
+    <h2 id="modalTitle">فاتورة جديدة</h2>
+    <input type="hidden" id="invoiceId">
+
+    <div class="field-row">
+      <label>
+        رقم الفاتورة
+        <input type="text" id="fInvoiceNumber" required placeholder="INV-0001">
+      </label>
+      <label>
+        التاريخ
+        <input type="date" id="fDate" required>
+      </label>
+    </div>
+
+    <label>
+      اسم العميل / المورد
+      <input type="text" id="fParty" required placeholder="اسم الجهة">
+    </label>
+
+    <div class="field-row">
+      <label>
+        التصنيف
+        <input type="text" id="fCategory" list="categoryList" placeholder="مبيعات، إيجار، مشتريات...">
+        <datalist id="categoryList"></datalist>
+      </label>
+      <label>
+        الحالة
+        <select id="fStatus">
+          <option value="unpaid">غير محصّلة</option>
+          <option value="paid">محصّلة</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label>
+        المبلغ قبل الضريبة (ريال)
+        <input type="number" id="fAmount" required min="0" step="0.01">
+      </label>
+      <label>
+        نسبة الضريبة %
+        <input type="number" id="fVatRate" min="0" max="100" step="0.5">
+      </label>
+    </div>
+
+    <div class="calc-preview">
+      <span>الضريبة: <b id="previewVat">0.00</b> ريال</span>
+      <span>الإجمالي: <b id="previewTotal">0.00</b> ريال</span>
+    </div>
+
+    <label>
+      ملاحظات
+      <textarea id="fNotes" rows="2" placeholder="اختياري"></textarea>
+    </label>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" id="cancelModal">إلغاء</button>
+      <button type="submit" class="btn-primary">حفظ الفاتورة</button>
+    </div>
+  </form>
+</div>
+
+<!-- نافذة مسح الفاتورة بالصورة -->
+<div class="modal-overlay" id="scanOverlay">
+  <div class="modal">
+    <h2>مسح فاتورة بالصورة</h2>
+
+    <div class="scan-note">
+      يستخدم هذا القسم ذكاء Claude الاصطناعي (عبر مفتاح API الخاص بك) لقراءة تفاصيل الفاتورة من الصورة تلقائيًا.
+      البيانات المستخرجة تُعرض عليك دائمًا للمراجعة والتعديل قبل الحفظ — لا شيء يُحفظ بدون تأكيدك، لتفادي أي خطأ في القراءة.
+    </div>
+
+    <label>
+      مفتاح Anthropic API الخاص بك
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+    </label>
+    <p class="hint">يُحفظ على جهازك فقط داخل المتصفح. لا تشاركه مع أحد.
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">احصل على مفتاح من هنا</a>
+    </p>
+
+    <label>
+      صورة الفاتورة
+      <input type="file" id="scanFileInput" accept="image/*">
+    </label>
+
+    <img id="scanPreviewImg" class="scan-preview-img" style="display:none">
+
+    <button type="button" class="btn-primary" id="analyzeBtn" style="width:100%; margin-top:6px;">
+      تحليل الفاتورة
+    </button>
+
+    <div class="scan-status" id="scanStatus"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" id="cancelScan">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
